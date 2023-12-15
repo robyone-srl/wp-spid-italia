@@ -220,12 +220,11 @@ function spid_handle() {
         echo '<small>';
         echo '<br>Auth state: '.( $sp->isAuthenticated() ? 'authenticated' : 'not authenticated' );
         echo '<br>idpEntityId: '. ( isset( $_SESSION['idpEntityId'] ) ? $_SESSION['idpEntityId'] : '(not set)' );
-        $xmlString = isset($_GET['SAMLResponse']) ? gzinflate(base64_decode($_GET['SAMLResponse'])) : ( isset($_POST['SAMLResponse']) ? base64_decode($_POST['SAMLResponse']) : '');
-        if ( $xmlString ) {
-            $xmlResp = new \DOMDocument();
-            $xmlResp->loadXML($xmlString);
-            echo '<br>SAMLResponse: '. $xmlString;
-        }
+        $xmlResp = getXmlRespDocument();
+        if($xmlResp)
+            echo '<br>XML Response: ' . htmlspecialchars($xmlResp->saveHTML());
+        else
+            echo '<br>No XML Response received.';
         echo '<br>Session: ';
         print_r( $_SESSION );
         echo '</small>';
@@ -261,46 +260,72 @@ function spid_handle() {
             //die();
             $sp->login( 'idp_'.$_GET['spid_idp'], $assertId, $attrId ); // Generate the login URL and redirect to the IdP login page
         } else if ( $sp->isAuthenticated() ) {
-            $attributes = $sp->getAttributes();
-            $name = $attributes['email'][0];    
-            $user = get_user_by( 'email', $attributes['email'] );
-            $cf = str_replace( 'TINIT-', '', $attributes['fiscalNumber']);
 
-            if ( empty( $user ) ) { // If user do not exists, look up by fiscal code
-                $users = get_users(
-                    array(
-                        'meta_key' => 'codice_fiscale',
-                        'meta_value' => $cf,
-                        'number' => 1,
-                        'count_total' => false,
-                    )
-                );
-                if ( !empty( $users ) ) {
-                    $user = reset( $users );
-                } else {
-                    $user = apply_filters( 'spid_registration_filter_new_user', $attributes );
-                }
-            }
-            if ( is_a( $user, 'WP_User' ) && !is_wp_error( $user ) && !empty( $user ) ) {
+            $issuerFormat = getXmlRespDocument()->getElementsByTagName("Issuer")[0]->getAttribute("Format");
 
-                apply_filters( 'spid_registration_filter_existing_user', $attributes, $user );
-                
-                spid_update_user( $user, $attributes );
+            $issueInstantResponse = strtotime(getXmlRespDocument()->documentElement->getAttribute("IssueInstant"));
+            $issueInstantAssertion = strtotime(getXmlRespDocument()->getElementsByTagName("Assertion")[0]->getAttribute("IssueInstant"));
 
-                wp_clear_auth_cookie();
-                wp_set_current_user ( $user->ID );
-                wp_set_auth_cookie  ( $user->ID );
-            
-                $redirect_to = (isset($_SESSION['spid_redirect_to']) && !empty($_SESSION['spid_redirect_to'])) ? $_SESSION['spid_redirect_to'] : admin_url();
-                wp_safe_redirect( apply_filters( 'spid_registration_default_login_redirect', $redirect_to ) );
-                exit();
 
-            } else {
+            if(!getXmlRespDocument()->documentElement->getAttribute("ID")){ //Test SPID Validator 8
                 remove_action('login_footer', 'wp_shake_js', 12);
                 add_filter( 'login_errors', function() {
-                    return 'Il tuo account non è abilitato su questo sito.';
+                    return 'Errore nell\'accesso con SPID (8). Per favore, contatta l\'amministratore.';
                  } );    
+	        } else if ($issuerFormat && $issuerFormat != "urn:oasis:names:tc:SAML:2.0:nameid-format:entity"){ //Test SPID Validator 30
+                remove_action('login_footer', 'wp_shake_js', 12);
+                add_filter( 'login_errors', function() {
+                    return 'Errore nell\'accesso con SPID (30). Per favore, contatta l\'amministratore.';
+                 } );    
+	        } else if ($issueInstantAssertion < $issueInstantResponse){ //Test SPID Validator 39
+                remove_action('login_footer', 'wp_shake_js', 12);
+                add_filter( 'login_errors', function() {
+                    return 'Errore nell\'accesso con SPID (39). Per favore, contatta l\'amministratore.';
+                 } );    
+	        } else {
+                $attributes = $sp->getAttributes();
+                $name = $attributes['email'][0];    
+                $user = get_user_by( 'email', $attributes['email'] );
+                $cf = str_replace( 'TINIT-', '', $attributes['fiscalNumber']);
+
+                if ( empty( $user ) ) { // If user do not exists, look up by fiscal code
+                    $users = get_users(
+                        array(
+                            'meta_key' => 'codice_fiscale',
+                            'meta_value' => $cf,
+                            'number' => 1,
+                            'count_total' => false,
+                        )
+                    );
+                    if ( !empty( $users ) ) {
+                        $user = reset( $users );
+                    } else {
+                        $user = apply_filters( 'spid_registration_filter_new_user', $attributes );
+                    }
+                }
+                if ( is_a( $user, 'WP_User' ) && !is_wp_error( $user ) && !empty( $user ) ) {
+
+                    apply_filters( 'spid_registration_filter_existing_user', $attributes, $user );
+                    
+                    spid_update_user( $user, $attributes );
+
+                    wp_clear_auth_cookie();
+                    wp_set_current_user ( $user->ID );
+                    wp_set_auth_cookie  ( $user->ID );
+                
+                    $redirect_to = (isset($_SESSION['spid_redirect_to']) && !empty($_SESSION['spid_redirect_to'])) ? $_SESSION['spid_redirect_to'] : admin_url();
+                    wp_safe_redirect( apply_filters( 'spid_registration_default_login_redirect', $redirect_to ) );
+                    exit();
+
+                } else {
+                    remove_action('login_footer', 'wp_shake_js', 12);
+                    add_filter( 'login_errors', function() {
+                        return 'Il tuo account non è abilitato su questo sito.';
+                    } );    
+                }
             }
+
+            
         } else {
             remove_action('login_footer', 'wp_shake_js', 12);
             add_filter( 'login_errors', function() { return 'SPID - Riprovare'; } );
@@ -310,9 +335,7 @@ function spid_handle() {
 }
 
 function spid_errors( $errorMsg2 ){
-    $xmlString = isset($_GET['SAMLResponse']) ? gzinflate(base64_decode($_GET['SAMLResponse'])) : base64_decode($_POST['SAMLResponse']);
-    $xmlResp = new \DOMDocument();
-    $xmlResp->loadXML($xmlString);
+    $xmlResp = getXmlRespDocument();
     if ( $xmlResp->textContent ) {
         switch ( $xmlResp->textContent ) {
             case stripos( $xmlResp->textContent, 'nr19') !== false:
@@ -449,6 +472,16 @@ function spid_option($name) {
 		return $options[$name];
 	}
 	return false;
+}
+
+
+function getXmlRespDocument() : \DOMDocument | null{
+    $xmlString = isset($_GET['SAMLResponse']) ? gzinflate(base64_decode($_GET['SAMLResponse'])) : base64_decode($_POST['SAMLResponse'] ?? '');
+	if(!$xmlString)
+    	return null;
+    $xmlResp = new \DOMDocument();
+    $xmlResp->loadXML($xmlString);
+    return $xmlResp;
 }
 
 ?>

@@ -235,6 +235,7 @@ function spid_handle() {
         wp_clear_auth_cookie();
         remove_action('login_footer', 'wp_shake_js', 12);
         add_filter( 'login_errors', function() { return 'Disconnesso da SPID'; } );
+        session_destroy();
         $sp->logoutPost( 0, wp_spid_italia_get_login_url( 'out' ) .'?spid_sso=out' );
     } else if (isset($_POST) && isset($_POST['selected_idp'])) {
         $idp = $_POST['selected_idp'];
@@ -261,10 +262,10 @@ function spid_handle() {
             $sp->login( 'idp_'.$_GET['spid_idp'], $assertId, $attrId ); // Generate the login URL and redirect to the IdP login page
         } else if ( $sp->isAuthenticated() ) {
 
-            $issuerFormat = getXmlRespDocument()->getElementsByTagName("Issuer")[0]->getAttribute("Format");
+            $issuerFormat = getXmlRespDocument()?->getElementsByTagName("Issuer")[0]?->getAttribute("Format") ?? null;
 
-            $issueInstantResponse = strtotime(getXmlRespDocument()->documentElement->getAttribute("IssueInstant"));
-            $issueInstantAssertion = strtotime(getXmlRespDocument()->getElementsByTagName("Assertion")[0]->getAttribute("IssueInstant"));
+            $issueInstantResponse = strtotime(getXmlRespDocument()?->documentElement?->getAttribute("IssueInstant") ?? false);
+            $issueInstantAssertion = strtotime(getXmlRespDocument()?->getElementsByTagName("Assertion")[0]?->getAttribute("IssueInstant") ?? false);
 
 
             if(!getXmlRespDocument()->documentElement->getAttribute("ID")){ //Test SPID Validator 8

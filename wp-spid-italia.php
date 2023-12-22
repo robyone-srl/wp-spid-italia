@@ -49,7 +49,7 @@ add_action( 'init', function() {
     if ( session_status() == PHP_SESSION_NONE ) {
         session_set_cookie_params(['samesite' => 'None']); 
         session_start(['cookie_secure' => true,'cookie_httponly' => true]);
-   }
+    }
     
     if ( isset( $_GET['spid_metadata'] ) && $_GET['spid_metadata'] == spid_get_metadata_token()  ) {
 	    header( 'Content-type: text/xml' );
@@ -188,6 +188,10 @@ add_action('init', function() {
 add_filter( 'login_message', function( $message ) { spid_handle(); });
 
 function spid_handle() {
+    if ( session_status() == PHP_SESSION_NONE ) {
+        session_start();
+    }
+
     $internal_debug = false;
     $spid_debug = ( WP_DEBUG === true ) || $internal_debug;
 

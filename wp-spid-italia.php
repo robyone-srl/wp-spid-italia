@@ -47,8 +47,9 @@ add_filter('wp_login_errors', function($errors) {
 add_action( 'init', function() {
     
     if ( session_status() == PHP_SESSION_NONE ) {
-        session_start();
-    }
+        session_set_cookie_params(['samesite' => 'None']); 
+        session_start(['cookie_secure' => true,'cookie_httponly' => true]);
+   }
     
     if ( isset( $_GET['spid_metadata'] ) && $_GET['spid_metadata'] == spid_get_metadata_token()  ) {
 	    header( 'Content-type: text/xml' );
@@ -245,11 +246,18 @@ function spid_handle() {
         }
 
         if ( isset( $_GET['spid_idp'] ) && $_GET['spid_idp'] != '' ) {
-            if ( $sp->isAuthenticated() ) {
-                session_destroy();
-		        $_SESSION = NULL;
-                session_start();
-            }
+              if ( $sp->isAuthenticated() ) {
+                unset($_SESSION['RequestID']);
+		        unset($_SESSION['idpName']);
+		        unset($_SESSION['idpEntityId']);
+		        unset($_SESSION['acsUrl']);
+		        unset($_SESSION['spidSession']['idp']);
+		        unset($_SESSION['spidSession']);
+		        
+		        unset($_SESSION['inResponseTo']);
+		        unset($_SESSION['spid_redirect_to']);
+		        unset($_SESSION['sloUrl']);
+           }
             if ( isset( $_GET['spid_redirect_to'] ) ) {
                 $_SESSION['spid_redirect_to'] = $_GET['spid_redirect_to'];
             }

@@ -22,6 +22,8 @@ class Response implements ResponseInterface
             $this->saml->settings['accepted_clock_skew_seconds'] : 0;
 
         $accepted_clock_skew_seconds = 7200; // MM 20210915
+    
+    	$acceptedauthcontext = array("https://www.spid.gov.it/SpidL1", "https://www.spid.gov.it/SpidL2", "https://www.spid.gov.it/SpidL3");
         
         $root = $xml->getElementsByTagName('Response')->item(0);
 
@@ -36,6 +38,8 @@ class Response implements ResponseInterface
             throw new \Exception("Invalid IssueInstant attribute on Response");
         } elseif (strtotime($root->getAttribute('IssueInstant')) > strtotime('now') + $accepted_clock_skew_seconds) {
             throw new \Exception("IssueInstant attribute on Response is in the future");
+        } elseif (strtotime($root->getAttribute('IssueInstant')) < strtotime('now') - $accepted_clock_skew_seconds) {
+            throw new \Exception("IssueInstant attribute on Response is in the past");
         }
 
         if ($root->getAttribute('InResponseTo') == "" || !isset($_SESSION['RequestID'])) {
@@ -181,6 +185,10 @@ class Response implements ResponseInterface
             'urn:oasis:names:tc:SAML:2.0:status:Success') {
             if ($hasAssertion && $xml->getElementsByTagName('AuthnStatement')->length <= 0) {
                 throw new \Exception("Missing AuthnStatement element");
+            } else if ($hasAssertion && $xml->getElementsByTagName('AuthnStatement')->item(0)->getElementsByTagName('AuthnContextClassRef')->length <= 0) {
+                throw new \Exception("Missing AuthnContextClassRef element");
+            } else if ($hasAssertion && !in_array($xml->getElementsByTagName('AuthnStatement')->item(0)->getElementsByTagName('AuthnContextClassRef')->item(0)->nodeValue, $acceptedauthcontext)) {
+                throw new \Exception("AuthnContextClassRef value non expected");
             }
         } elseif ($xml->getElementsByTagName('StatusCode')->item(0)->getAttribute('Value') !=
             'urn:oasis:names:tc:SAML:2.0:status:Success') {
@@ -197,7 +205,7 @@ class Response implements ResponseInterface
             // Status code != success
             return false;
         }
-
+    
         // Response OK
         $session = $this->spidSession($xml);
         $_SESSION['spidSession'] = (array)$session;

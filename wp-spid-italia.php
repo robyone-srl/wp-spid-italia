@@ -1,8 +1,8 @@
 <?php
 /*
 Plugin Name: WP SPID Italia
-Description: SPID - Sistema Pubblico di Identità Digitale con modifiche secondo suggerimenti degli issue su GitHub
-Author: Marco Milesi e Robyone
+Description: SPID - Sistema Pubblico di Identità Digitale
+Author: Marco Milesi
 Version: 2.8.1
 Author URI: http://www.marcomilesi.com
 */

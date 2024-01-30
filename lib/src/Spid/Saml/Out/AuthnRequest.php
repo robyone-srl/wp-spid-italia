@@ -12,6 +12,7 @@ class AuthnRequest extends Base implements RequestInterface
     {
         $id = $this->generateID();
         $issueInstant = $this->generateIssueInstant();
+    	$_SESSION['RequestIssueInstant'] = $issueInstant;
         $entityId = $this->idp->sp->settings['sp_entityid'];
 
         $idpEntityId = $this->idp->metadata['idpEntityId'];

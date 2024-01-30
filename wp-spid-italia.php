@@ -277,12 +277,11 @@ function spid_handle() {
             $sp->login( 'idp_'.$_GET['spid_idp'], $assertId, $attrId ); // Generate the login URL and redirect to the IdP login page
         } else if ( $sp->isAuthenticated() ) {
 
-            $issuerFormat = getXmlRespDocument()?->getElementsByTagName("Issuer")[0]?->getAttribute("Format") ?? null;
+        $issuerFormat = getXmlRespDocument()?->getElementsByTagName("Issuer")[0]?->getAttribute("Format") ?? null;
 
-            $issueInstantResponse = strtotime(getXmlRespDocument()?->documentElement?->getAttribute("IssueInstant") ?? false);
-            $issueInstantAssertion = strtotime(getXmlRespDocument()?->getElementsByTagName("Assertion")[0]?->getAttribute("IssueInstant") ?? false);
-
-
+        $issueInstantRequest = strtotime($_SESSION['RequestIssueInstant'] ?? false);
+        $issueInstantAssertion = strtotime(getXmlRespDocument()?->getElementsByTagName("Assertion")[0]?->getAttribute("IssueInstant") ?? false);
+        
             if(!getXmlRespDocument()->documentElement->getAttribute("ID")){ //Test SPID Validator 8
                 remove_action('login_footer', 'wp_shake_js', 12);
                 add_filter( 'login_errors', function() {
@@ -293,11 +292,11 @@ function spid_handle() {
                 add_filter( 'login_errors', function() {
                     return 'Errore nell\'accesso con SPID (30). Per favore, contatta l\'amministratore.';
                  } );    
-	        } else if ($issueInstantAssertion < $issueInstantResponse){ //Test SPID Validator 39
-                remove_action('login_footer', 'wp_shake_js', 12);
-                add_filter( 'login_errors', function() {
-                    return 'Errore nell\'accesso con SPID (39). Per favore, contatta l\'amministratore.';
-                 } );    
+            } else if ($issueInstantAssertion < $issueInstantRequest){ //Test SPID Validator 39
+    			remove_action('login_footer', 'wp_shake_js', 12);
+    			add_filter( 'login_errors', function() {
+        			return 'Errore nell\'accesso con SPID (39). Per favore, contatta l\'amministratore.';
+     			} );    
 	        } else {
                 $attributes = $sp->getAttributes();
                 $name = $attributes['email'][0];    

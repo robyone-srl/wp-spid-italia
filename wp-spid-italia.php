@@ -47,13 +47,7 @@ add_filter('wp_login_errors', function($errors) {
     return $errors;
 } );
   
-add_action( 'init', function() {
-    
-    if ( session_status() == PHP_SESSION_NONE ) {
-        session_set_cookie_params(['samesite' => 'None']); 
-        session_start(['cookie_secure' => true,'cookie_httponly' => true]);
-    }
-    
+add_action( 'init', function() {    
     if ( isset( $_GET['spid_metadata'] ) && $_GET['spid_metadata'] == spid_get_metadata_token()  ) {
 	    header( 'Content-type: text/xml' );
         $sp = spid_load();
@@ -240,7 +234,6 @@ function spid_handle() {
     }
 
     if ( isset( $_GET['spid_sso'] ) && $_GET['spid_sso'] == 'out' ) {
-        wp_clear_auth_cookie();
         remove_action('login_footer', 'wp_shake_js', 12);
         add_filter( 'login_errors', function() { return 'Disconnesso da SPID'; } );
         session_destroy();

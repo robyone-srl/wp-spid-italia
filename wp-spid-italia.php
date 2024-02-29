@@ -47,7 +47,12 @@ add_filter('wp_login_errors', function($errors) {
     return $errors;
 } );
   
-add_action( 'init', function() {    
+add_action( 'init', function() {
+    
+    if ( session_status() == PHP_SESSION_NONE ) {
+        session_start();
+    }
+    
     if ( isset( $_GET['spid_metadata'] ) && $_GET['spid_metadata'] == spid_get_metadata_token()  ) {
 	    header( 'Content-type: text/xml' );
         $sp = spid_load();

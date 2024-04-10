@@ -47,12 +47,7 @@ add_filter('wp_login_errors', function($errors) {
     return $errors;
 } );
   
-add_action( 'init', function() {
-    
-    if ( session_status() == PHP_SESSION_NONE ) {
-        session_start();
-    }
-    
+add_action( 'init', function() {    
     if ( isset( $_GET['spid_metadata'] ) && $_GET['spid_metadata'] == spid_get_metadata_token()  ) {
 	    header( 'Content-type: text/xml' );
         $sp = spid_load();
@@ -171,6 +166,11 @@ function spid_get_metadata_url( $type = NULL ) {
 }
 
 function spid_get_metadata_token() {
+    
+    if ( session_status() == PHP_SESSION_NONE ) {
+        session_start();
+    }
+    
     $token = get_option( 'spid_metadata_token');
     if ( !$token ) {
         update_option( 'spid_metadata_token', substr(str_shuffle(str_repeat($x='0123456789-abcdefghijklmnopqrstuvwxyz', ceil( 15 / strlen($x)) )), 1, 15 ) );
